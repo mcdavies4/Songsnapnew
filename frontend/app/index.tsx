@@ -21,12 +21,14 @@ export default function Index() {
   const router = useRouter();
   const { isAuthenticated, isLoading, login } = useAuthStore();
 
+  const redirectUri = 'https://auth.expo.io/@anonymous/songsnap';
+  
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: '917436741289-sg2c5rubhh5dvt0sk8gl2fhtgfhcfor0.apps.googleusercontent.com',
     iosClientId: '917436741289-sg2c5rubhh5dvt0sk8gl2fhtgfhcfor0.apps.googleusercontent.com',
     androidClientId: '917436741289-sg2c5rubhh5dvt0sk8gl2fhtgfhcfor0.apps.googleusercontent.com',
     scopes: ['profile', 'email'],
-    redirectUri: 'https://auth.expo.io/@anonymous/songsnap',
+    redirectUri: redirectUri,
   });
 
   useEffect(() => {
