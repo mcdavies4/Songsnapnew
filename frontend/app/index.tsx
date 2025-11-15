@@ -63,7 +63,7 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.logoContainer}>
         <View style={styles.logo}>
           <Text style={styles.logoIcon}>🎵</Text>
@@ -114,7 +114,7 @@ export default function Index() {
           </Text>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
