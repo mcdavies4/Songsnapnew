@@ -213,6 +213,45 @@ async def get_current_user_profile(user_id: str = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+@api_router.post("/auth/demo")
+async def demo_login():
+    """Create or get demo user for testing"""
+    try:
+        # Check if demo user exists
+        demo_email = "demo@songsnap.com"
+        user = await db.users.find_one({"email": demo_email})
+        
+        if not user:
+            # Create demo user
+            user_doc = {
+                "google_id": "demo_user",
+                "email": demo_email,
+                "name": "Demo User",
+                "username": "demouser",
+                "profile_pic": "",
+                "bio": "Demo account for testing SongSnap",
+                "followers_count": 0,
+                "following_count": 0,
+                "posts_count": 0,
+                "created_at": datetime.utcnow()
+            }
+            result = await db.users.insert_one(user_doc)
+            user_doc["_id"] = result.inserted_id
+            user = user_doc
+        
+        # Create JWT token
+        token = create_token(str(user["_id"]))
+        user_data = serialize_doc(user)
+        
+        return {
+            "token": token,
+            "user": user_data
+        }
+    
+    except Exception as e:
+        logger.error(f"Demo auth error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ========== USER ROUTES ==========
 
 @api_router.get("/users/search")
