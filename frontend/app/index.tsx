@@ -122,6 +122,13 @@ export default function Index() {
         </TouchableOpacity>
 
         <Text style={styles.signInText}>Sign in to share and discover music</Text>
+        
+        <TouchableOpacity
+          style={styles.demoButton}
+          onPress={handleDemoMode}
+        >
+          <Text style={styles.demoButtonText}>Try Demo Mode</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.features}>
