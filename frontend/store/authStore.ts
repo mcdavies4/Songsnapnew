@@ -22,15 +22,23 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (token: string, user: User) => {
     console.log('Auth Store: Saving token and user...');
+    
+    // Set cached token immediately for instant API access
+    setApiToken(token);
+    console.log('Auth Store: Token cached for immediate API access');
+    
+    // Also save to AsyncStorage for persistence
     await AsyncStorage.setItem('auth_token', token);
     await AsyncStorage.setItem('user', JSON.stringify(user));
-    console.log('Auth Store: Token saved, token length:', token.length);
+    console.log('Auth Store: Token saved to AsyncStorage, length:', token.length);
     console.log('Auth Store: User saved:', user.username);
+    
     set({ user, token, isAuthenticated: true, isLoading: false });
     console.log('Auth Store: Login complete!');
   },
 
   logout: async () => {
+    clearApiToken();
     await AsyncStorage.removeItem('auth_token');
     await AsyncStorage.removeItem('user');
     set({ user: null, token: null, isAuthenticated: false });
