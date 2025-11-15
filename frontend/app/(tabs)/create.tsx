@@ -36,11 +36,15 @@ export default function CreatePostScreen() {
 
     setSearching(true);
     try {
+      console.log('Searching music:', searchSource, searchQuery);
       const endpoint = searchSource === 'spotify' ? '/spotify/search' : '/youtube/search';
       const response = await api.get(`${endpoint}?q=${searchQuery}`);
+      console.log('Search results:', response.data.length, 'tracks');
       setSearchResults(response.data);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to search music');
+      console.error('Search error:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Failed to search music';
+      Alert.alert('Search Error', errorMsg);
     } finally {
       setSearching(false);
     }
