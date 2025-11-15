@@ -191,7 +191,7 @@ class APITester:
         
         # Test user search without auth
         try:
-            response = self.make_request("GET", "/users/search?q=test")
+            response = self.make_request("GET", "/users/search?q=test", skip_auth=True)
             if response.status_code == 401:
                 self.log_test("GET /api/users/search (no auth)", True, 
                             "Correctly requires authentication")
