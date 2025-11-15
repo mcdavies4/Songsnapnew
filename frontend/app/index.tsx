@@ -66,26 +66,13 @@ export default function Index() {
 
   const handleDemoMode = async () => {
     try {
-      // Create a demo user session
-      const demoUser = {
-        id: 'demo_user_' + Date.now(),
-        email: 'demo@songsnap.com',
-        name: 'Demo User',
-        username: 'demouser',
-        profile_pic: '',
-        bio: 'Demo account for testing',
-        google_id: 'demo',
-        followers_count: 0,
-        following_count: 0,
-        posts_count: 0,
-        created_at: new Date().toISOString(),
-      };
-      
-      const demoToken = 'demo_token_' + Date.now();
-      await login(demoToken, demoUser);
+      // Call backend demo endpoint to get real token
+      const result = await api.post('/auth/demo');
+      await login(result.data.token, result.data.user);
       router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start demo mode');
+    } catch (error: any) {
+      console.error('Demo mode error:', error);
+      Alert.alert('Error', 'Failed to start demo mode: ' + (error.response?.data?.detail || error.message));
     }
   };
 
