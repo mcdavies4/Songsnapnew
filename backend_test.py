@@ -41,12 +41,12 @@ class APITester:
             print(f"   Response: {response_data}")
         print()
     
-    def make_request(self, method: str, endpoint: str, **kwargs) -> requests.Response:
+    def make_request(self, method: str, endpoint: str, skip_auth: bool = False, **kwargs) -> requests.Response:
         """Make HTTP request with proper headers"""
         url = f"{self.base_url}{endpoint}"
         headers = kwargs.get('headers', {})
         
-        if self.auth_token and 'Authorization' not in headers:
+        if self.auth_token and 'Authorization' not in headers and not skip_auth:
             headers['Authorization'] = f"Bearer {self.auth_token}"
         
         kwargs['headers'] = headers
