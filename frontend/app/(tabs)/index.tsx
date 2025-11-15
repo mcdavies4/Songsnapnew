@@ -18,19 +18,30 @@ export default function FeedScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { isAuthenticated } = useAuthStore();
 
   const loadPosts = useCallback(async () => {
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping load posts');
+      setLoading(false);
+      return;
+    }
+    
     try {
+      console.log('Loading posts from:', activeTab);
       const endpoint = activeTab === 'all' ? '/posts/feed' : '/posts/following';
       const response = await api.get(endpoint);
+      console.log('Posts loaded:', response.data.length);
       setPosts(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load posts:', error);
+      console.error('Error response:', error.response?.data);
+      Alert.alert('Error', 'Failed to load posts. Please try logging in again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
     setLoading(true);
