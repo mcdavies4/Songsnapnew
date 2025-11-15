@@ -127,7 +127,7 @@ class APITester:
         
         # Test without authentication (should fail)
         try:
-            response = self.make_request("GET", "/spotify/search?q=taylor swift")
+            response = self.make_request("GET", "/spotify/search?q=taylor swift", skip_auth=True)
             if response.status_code == 401:
                 self.log_test("GET /api/spotify/search (no auth)", True, 
                             "Correctly requires authentication")
