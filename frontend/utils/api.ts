@@ -14,11 +14,30 @@ const api = axios.create({
   },
 });
 
+// Global token cache to avoid AsyncStorage race conditions
+let cachedToken: string | null = null;
+
+export const setApiToken = (token: string) => {
+  cachedToken = token;
+  console.log('API Token cached:', token ? 'set' : 'cleared');
+};
+
+export const clearApiToken = () => {
+  cachedToken = null;
+};
+
 // Add auth token to requests
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('auth_token');
-    console.log('Token from storage:', token ? 'exists' : 'missing');
+    // Try cached token first (avoids AsyncStorage race condition)
+    let token = cachedToken;
+    
+    // Fallback to AsyncStorage if no cached token
+    if (!token) {
+      token = await AsyncStorage.getItem('auth_token');
+    }
+    
+    console.log('Token for request:', token ? 'exists' : 'missing');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
