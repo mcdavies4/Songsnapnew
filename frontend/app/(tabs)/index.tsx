@@ -7,11 +7,13 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PostCard from '../../components/PostCard';
 import { Post } from '../../types';
 import api from '../../utils/api';
+import { useAuthStore } from '../../store/authStore';
 
 export default function FeedScreen() {
   const [activeTab, setActiveTab] = useState<'all' | 'following'>('all');
