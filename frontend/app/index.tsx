@@ -66,14 +66,20 @@ export default function Index() {
 
   const handleDemoMode = async () => {
     console.log('Demo mode button pressed!');
-    Alert.alert('Demo Mode', 'Connecting to demo account...', [{ text: 'OK' }]);
     
     try {
       console.log('Calling demo endpoint...');
       // Call backend demo endpoint to get real token
       const result = await api.post('/auth/demo');
       console.log('Demo login successful:', result.data);
+      
+      // Save to store first
       await login(result.data.token, result.data.user);
+      console.log('Login complete, token saved');
+      
+      // Small delay to ensure AsyncStorage write completes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       console.log('Navigating to tabs...');
       router.replace('/(tabs)');
     } catch (error: any) {
