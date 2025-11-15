@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User } from '../types';
-import api from '../utils/api';
+import api, { setApiToken, clearApiToken } from '../utils/api';
 
 interface AuthState {
   user: User | null;
