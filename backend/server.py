@@ -364,7 +364,7 @@ async def get_all_feed(skip: int = 0, limit: int = 20, user_id: str = Depends(ge
         # Check if current user liked this post
         like = await db.likes.find_one({
             "user_id": user_id,
-            "post_id": str(post["_id"])
+            "post_id": post_data["id"]
         })
         post_data["is_liked"] = like is not None
         
@@ -397,7 +397,7 @@ async def get_following_feed(skip: int = 0, limit: int = 20, user_id: str = Depe
         # Check if current user liked this post
         like = await db.likes.find_one({
             "user_id": user_id,
-            "post_id": str(post["_id"])
+            "post_id": post_data["id"]
         })
         post_data["is_liked"] = like is not None
         
