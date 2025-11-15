@@ -40,8 +40,7 @@ export default function SearchScreen() {
   const renderUser = ({ item }: { item: User }) => (
     <TouchableOpacity style={styles.userCard}>
       <Image
-        source=
-{item.profile_pic ? { uri: item.profile_pic } : require('../../assets/images/icon.png')}
+        source={item.profile_pic ? { uri: item.profile_pic } : require('../../assets/images/icon.png')}
         style={styles.avatar}
       />
       <View style={styles.userInfo}>
