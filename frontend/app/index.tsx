@@ -65,10 +65,16 @@ export default function Index() {
   };
 
   const handleDemoMode = async () => {
+    console.log('Demo mode button pressed!');
+    Alert.alert('Demo Mode', 'Connecting to demo account...', [{ text: 'OK' }]);
+    
     try {
+      console.log('Calling demo endpoint...');
       // Call backend demo endpoint to get real token
       const result = await api.post('/auth/demo');
+      console.log('Demo login successful:', result.data);
       await login(result.data.token, result.data.user);
+      console.log('Navigating to tabs...');
       router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Demo mode error:', error);
