@@ -55,7 +55,37 @@ export default function Index() {
       await login(result.data.token, result.data.user);
       router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to sign in');
+      console.error('Google auth error:', error);
+      Alert.alert(
+        'Sign In Error', 
+        'Unable to complete Google sign-in. Please ensure the redirect URI is configured in Google Console:\n\nhttps://auth.expo.io/@anonymous/songsnap\n\nOr use Demo Mode to explore the app.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleDemoMode = async () => {
+    try {
+      // Create a demo user session
+      const demoUser = {
+        id: 'demo_user_' + Date.now(),
+        email: 'demo@songsnap.com',
+        name: 'Demo User',
+        username: 'demouser',
+        profile_pic: '',
+        bio: 'Demo account for testing',
+        google_id: 'demo',
+        followers_count: 0,
+        following_count: 0,
+        posts_count: 0,
+        created_at: new Date().toISOString(),
+      };
+      
+      const demoToken = 'demo_token_' + Date.now();
+      await login(demoToken, demoUser);
+      router.replace('/(tabs)');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start demo mode');
     }
   };
 
