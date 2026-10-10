@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "SongSnap",
+    "slug": "songsnap",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "songsnap",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "backgroundColor": "#0a0a0a",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.songsnap.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.songsnap.app",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/images/favicon.png",
+      "name": "SongSnap",
+      "shortName": "SongSnap",
+      "description": "Share what you're listening to.",
+      "themeColor": "#0a0a0a",
+      "backgroundColor": "#0a0a0a"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      "expo-audio"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
