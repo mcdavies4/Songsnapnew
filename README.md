@@ -45,11 +45,10 @@ supabase/functions/music-search/   Spotify + YouTube search (keeps API keys serv
 ## 3. Music search function
 
 ```bash
-npm i -g supabase            # or: npx supabase …
-supabase login
-supabase link --project-ref <ref>
-supabase secrets set SPOTIFY_CLIENT_ID=... SPOTIFY_CLIENT_SECRET=... YOUTUBE_API_KEY=...
-supabase functions deploy music-search
+npx supabase login
+npx supabase link --project-ref <ref>
+npx supabase secrets set SPOTIFY_CLIENT_ID=... SPOTIFY_CLIENT_SECRET=... YOUTUBE_API_KEY=...
+npx supabase functions deploy music-search
 ```
 
 Use the same Spotify / YouTube keys the Emergent backend had.
@@ -66,12 +65,14 @@ npx expo start               # press w for web, or scan with Expo Go
 
 ## 5. Deploy the web app
 
-Build: `npx expo export --platform web` → static files in `dist/`.
+Build: `npx expo export --platform web --clear` → static files in `dist/`.
 
 **Cloudflare Pages** – connect the repo:
-- Build command: `npx expo export --platform web`
+- Build command: `npx expo export --platform web --clear`
 - Output directory: `dist`
 - Environment variables: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `NODE_VERSION=22`
+
+Env vars are baked in at build time: after adding or changing them, redeploy (Deployments → Retry deployment). If they're missing, the site shows a "SongSnap isn't configured" message.
 
 Cloudflare serves `index.html` for unknown paths, so deep links like `/post/<id>` just work.
 
