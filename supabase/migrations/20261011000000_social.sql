@@ -211,3 +211,6 @@ as $$
   where p.song_data->>'source' = p_source and p.song_data->>'track_id' = p_track_id;
 $$;
 grant execute on function public.track_summary(text, text) to authenticated;
+
+-- Make the API pick up the new functions immediately
+notify pgrst, 'reload schema';

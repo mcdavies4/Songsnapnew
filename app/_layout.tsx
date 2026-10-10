@@ -1,5 +1,3 @@
-import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold, Figtree_700Bold } from '@expo-google-fonts/figtree';
-import { Unbounded_600SemiBold, Unbounded_700Bold } from '@expo-google-fonts/unbounded';
 import { Ionicons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
@@ -37,13 +35,18 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   const ready = useAuth((s) => s.ready);
   const init = useAuth((s) => s.init);
+  // Fonts live in assets/fonts, not node_modules: Cloudflare Pages doesn't upload
+  // folders named node_modules, so fonts referenced from there 404 on the live site.
+  // Icon fonts are registered under the family names @expo/vector-icons uses.
   const [fontsLoaded, fontError] = useFonts({
-    Unbounded_600SemiBold,
-    Unbounded_700Bold,
-    Figtree_400Regular,
-    Figtree_500Medium,
-    Figtree_600SemiBold,
-    Figtree_700Bold,
+    Unbounded_600SemiBold: require('../assets/fonts/Unbounded_600SemiBold.ttf'),
+    Unbounded_700Bold: require('../assets/fonts/Unbounded_700Bold.ttf'),
+    Figtree_400Regular: require('../assets/fonts/Figtree_400Regular.ttf'),
+    Figtree_500Medium: require('../assets/fonts/Figtree_500Medium.ttf'),
+    Figtree_600SemiBold: require('../assets/fonts/Figtree_600SemiBold.ttf'),
+    Figtree_700Bold: require('../assets/fonts/Figtree_700Bold.ttf'),
+    ionicons: require('../assets/fonts/Ionicons.ttf'),
+    FontAwesome: require('../assets/fonts/FontAwesome.ttf'),
   });
 
   useEffect(() => {
