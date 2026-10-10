@@ -1,3 +1,5 @@
+import type { MoodKey, ReactionKey } from './theme';
+
 export type MusicSource = 'spotify' | 'youtube';
 
 export interface Author {
@@ -28,22 +30,33 @@ export interface SongData {
   track_id: string;
 }
 
+export interface CommentPreview {
+  id: string;
+  content: string;
+  created_at: string;
+  author: Author;
+}
+
 export interface Post {
   id: string;
   user_id: string;
   content: string;
   song_data: SongData;
+  mood: MoodKey | null;
   likes_count: number;
+  reaction_counts: Partial<Record<ReactionKey, number>>;
   comments_count: number;
   created_at: string;
-  is_liked: boolean;
+  my_reaction: ReactionKey | null;
   author: Author;
+  top_comment: CommentPreview | null;
 }
 
 export interface Comment {
   id: string;
   post_id: string;
   user_id: string;
+  parent_id: string | null;
   content: string;
   created_at: string;
   author: Author;
@@ -58,4 +71,20 @@ export interface Track {
   preview_url: string | null;
   external_url: string;
   source: MusicSource;
+}
+
+export interface TrackStat {
+  source: MusicSource;
+  track_id: string;
+  song_data: SongData;
+  post_count: number;
+  people: number;
+  last_posted: string;
+}
+
+export interface TrackSummary {
+  song_data: SongData | null;
+  post_count: number;
+  people: number;
+  top_mood: MoodKey | null;
 }

@@ -1,10 +1,12 @@
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/Button';
 import PostList from '../../components/PostList';
 import ProfileHeader from '../../components/ProfileHeader';
 import { Empty, Header, Loading, Screen } from '../../components/Screen';
 import { follow, getProfile, isFollowing, unfollow } from '../../lib/api';
+import { colors, fonts } from '../../lib/theme';
 import type { Profile } from '../../lib/types';
 import { errorMessage, notify } from '../../lib/ui';
 import { useAuth } from '../../store/auth';
@@ -18,6 +20,7 @@ export default function UserScreen() {
   const [following, setFollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [glow, setGlow] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id || !myId || id === myId) return;
@@ -50,7 +53,7 @@ export default function UserScreen() {
     } catch (e) {
       setFollowing(!next);
       setProfile((p) => (p ? { ...p, followers_count: p.followers_count + (next ? -1 : 1) } : p));
-      notify('Error', errorMessage(e));
+      notify("Couldn't update follow", errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -60,30 +63,38 @@ export default function UserScreen() {
     <Screen>
       <Header title={profile ? `@${profile.username}` : 'Profile'} back />
       {error ? (
-        <Empty icon="person-outline" text={error} />
+        <Empty emoji="🫥" title="Profile not found" text="This account may have been deleted." />
       ) : !profile ? (
         <Loading />
       ) : (
         <PostList
-          scope="user"
-          userId={profile.id}
-          emptyText={`${profile.name} hasn't shared anything yet`}
+          query={{ scope: 'user', userId: profile.id }}
+          onFirstPost={(p) => setGlow(p?.song_data.image_url ?? null)}
+          empty={<Empty emoji="🎧" text={`${profile.name} hasn't shared a song yet.`} />}
           header={
-            <ProfileHeader
-              profile={profile}
-              actions={
-                <Button
-                  title={following ? 'Following' : 'Follow'}
-                  variant={following ? 'outline' : 'primary'}
-                  onPress={toggleFollow}
-                  disabled={busy}
-                  style={{ flex: 1, maxWidth: 260 }}
-                />
-              }
-            />
+            <View>
+              <ProfileHeader
+                profile={profile}
+                glowUri={glow}
+                actions={
+                  <Button
+                    title={following ? 'Following' : 'Follow'}
+                    variant={following ? 'quiet' : 'primary'}
+                    onPress={toggleFollow}
+                    disabled={busy}
+                    style={{ flex: 1, maxWidth: 240, ...(following ? { backgroundColor: 'rgba(255,255,255,0.14)' } : {}) }}
+                  />
+                }
+              />
+              <Text style={styles.section}>Songs {profile.name.split(' ')[0]} has shared</Text>
+            </View>
           }
         />
       )}
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  section: { color: colors.ink, fontFamily: fonts.displaySemi, fontSize: 15, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 4 },
+});

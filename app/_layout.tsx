@@ -1,4 +1,7 @@
+import { Figtree_400Regular, Figtree_500Medium, Figtree_600SemiBold, Figtree_700Bold } from '@expo-google-fonts/figtree';
+import { Unbounded_600SemiBold, Unbounded_700Bold } from '@expo-google-fonts/unbounded';
 import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 import { Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -11,7 +14,7 @@ import { useAuth } from '../store/auth';
 
 function Problem({ title, detail, onRetry }: { title: string; detail: string; onRetry?: () => void }) {
   return (
-    <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={styles.problem}>
+    <ScrollView style={{ backgroundColor: colors.stage }} contentContainerStyle={styles.problem}>
       <Ionicons name="warning-outline" size={48} color={colors.danger} />
       <Text style={styles.problemTitle}>{title}</Text>
       <Text style={styles.problemDetail} selectable>
@@ -34,6 +37,14 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 export default function RootLayout() {
   const ready = useAuth((s) => s.ready);
   const init = useAuth((s) => s.init);
+  const [fontsLoaded, fontError] = useFonts({
+    Unbounded_600SemiBold,
+    Unbounded_700Bold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+  });
 
   useEffect(() => {
     if (configError) return;
@@ -43,18 +54,18 @@ export default function RootLayout() {
   let body;
   if (configError) {
     body = <Problem title="SongSnap isn't configured" detail={configError} />;
-  } else if (!ready) {
+  } else if (!ready || (!fontsLoaded && !fontError)) {
     body = (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.accent} />
+        <ActivityIndicator size="large" color={colors.amber} />
       </View>
     );
   } else {
-    body = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />;
+    body = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.stage } }} />;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.bg }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.stage }}>
       <SafeAreaProvider>
         <StatusBar style="light" />
         {body}
@@ -64,10 +75,10 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.stage },
   problem: { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 14 },
-  problemTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  problemDetail: { color: colors.textMuted, fontSize: 14, textAlign: 'center', lineHeight: 21, maxWidth: 480 },
-  retry: { marginTop: 8, backgroundColor: colors.accent, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24 },
-  retryText: { color: colors.bg, fontWeight: '700' },
+  problemTitle: { color: colors.ink, fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  problemDetail: { color: colors.haze, fontSize: 14, textAlign: 'center', lineHeight: 21, maxWidth: 480 },
+  retry: { marginTop: 8, backgroundColor: colors.amber, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 24 },
+  retryText: { color: colors.amberInk, fontWeight: '700' },
 });

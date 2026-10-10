@@ -1,25 +1,39 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 import type { Profile } from '../lib/types';
 import Avatar from './Avatar';
+import { ArtGlow } from './Sleeve';
 
-export default function ProfileHeader({ profile, actions }: { profile: Profile; actions?: ReactNode }) {
+export default function ProfileHeader({
+  profile,
+  actions,
+  glowUri,
+}: {
+  profile: Profile;
+  actions?: ReactNode;
+  /** Album art of their latest post, used when they have no photo. */
+  glowUri?: string | null;
+}) {
   return (
-    <View style={styles.wrap}>
-      <Avatar uri={profile.profile_pic} name={profile.name} size={96} />
-      <Text style={styles.name}>{profile.name}</Text>
-      <Text style={styles.username}>@{profile.username}</Text>
-      {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+    <ArtGlow uri={profile.profile_pic ?? glowUri} style={styles.glow}>
+      <View style={styles.wrap}>
+        <Avatar uri={profile.profile_pic} name={profile.name} size={92} />
+        <Text style={styles.name} numberOfLines={2}>
+          {profile.name}
+        </Text>
+        <Text style={styles.username}>@{profile.username}</Text>
+        {!!profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
-      <View style={styles.stats}>
-        <Stat n={profile.posts_count} label="Posts" />
-        <Stat n={profile.followers_count} label="Followers" />
-        <Stat n={profile.following_count} label="Following" />
+        <View style={styles.stats}>
+          <Stat n={profile.posts_count} label={profile.posts_count === 1 ? 'song shared' : 'songs shared'} />
+          <Stat n={profile.followers_count} label={profile.followers_count === 1 ? 'follower' : 'followers'} />
+          <Stat n={profile.following_count} label="following" />
+        </View>
+
+        {actions && <View style={styles.actions}>{actions}</View>}
       </View>
-
-      {actions && <View style={styles.actions}>{actions}</View>}
-    </View>
+    </ArtGlow>
   );
 }
 
@@ -33,19 +47,22 @@ function Stat({ n, label }: { n: number; label: string }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    alignItems: 'center',
-    padding: 24,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    marginBottom: 16,
+  glow: { borderRadius: 0 },
+  wrap: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 28, paddingBottom: 22 },
+  name: { fontSize: 22, fontFamily: fonts.display, color: '#fff', marginTop: 14, textAlign: 'center' },
+  username: { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontFamily: fonts.bodyMedium, marginTop: 4 },
+  bio: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: fonts.body,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 22,
+    maxWidth: 420,
   },
-  name: { fontSize: 22, fontWeight: 'bold', color: colors.text, marginTop: 14 },
-  username: { fontSize: 15, color: colors.textFaint, marginTop: 2 },
-  bio: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 10, lineHeight: 20 },
-  stats: { flexDirection: 'row', gap: 32, marginTop: 18 },
+  stats: { flexDirection: 'row', gap: 28, marginTop: 20 },
   stat: { alignItems: 'center' },
-  statN: { fontSize: 20, fontWeight: 'bold', color: colors.text },
-  statLabel: { fontSize: 12, color: colors.textFaint, marginTop: 2 },
+  statN: { fontSize: 20, fontFamily: fonts.display, color: '#fff' },
+  statLabel: { fontSize: 12, color: 'rgba(255,255,255,0.65)', fontFamily: fonts.body, marginTop: 2 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 20, alignSelf: 'stretch', justifyContent: 'center' },
 });

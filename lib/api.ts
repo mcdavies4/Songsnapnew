@@ -1,5 +1,15 @@
 import { supabase } from './supabase';
-import type { Comment, Post, Profile, SongData, Track, MusicSource } from './types';
+import type { MoodKey, ReactionKey } from './theme';
+import type {
+  Comment,
+  MusicSource,
+  Post,
+  Profile,
+  SongData,
+  Track,
+  TrackStat,
+  TrackSummary,
+} from './types';
 
 // Profiles hide `email` from other users, so always select these columns explicitly.
 export const PROFILE_COLUMNS =
@@ -80,49 +90,61 @@ export async function unfollow(myId: string, targetId: string) {
 
 // ---------- Posts ----------
 
-export type FeedScope = 'all' | 'following' | 'user';
+export type FeedScope = 'all' | 'following' | 'user' | 'track';
 
-export async function getFeed(opts: {
+export type FeedQuery = {
   scope: FeedScope;
   userId?: string;
-  before?: string | null;
-  limit?: number;
-}): Promise<Post[]> {
+  mood?: MoodKey | null;
+  source?: MusicSource;
+  trackId?: string;
+};
+
+function normalisePost(p: Post): Post {
+  return { ...p, reaction_counts: p.reaction_counts ?? {}, my_reaction: p.my_reaction ?? null };
+}
+
+export async function getFeed(q: FeedQuery & { before?: string | null; limit?: number }): Promise<Post[]> {
   const { data, error } = await supabase.rpc('get_feed', {
-    p_scope: opts.scope,
-    p_user_id: opts.userId ?? null,
-    p_limit: opts.limit ?? 20,
-    p_before: opts.before ?? null,
+    p_scope: q.scope,
+    p_user_id: q.userId ?? null,
+    p_limit: q.limit ?? 20,
+    p_before: q.before ?? null,
+    p_mood: q.mood ?? null,
+    p_source: q.source ?? null,
+    p_track_id: q.trackId ?? null,
   });
   if (error) fail(error, 'Could not load posts');
-  return data as Post[];
+  return (data as Post[]).map(normalisePost);
 }
 
 export async function getPost(id: string): Promise<Post | null> {
-  // Reuse the feed RPC shape by fetching the post then its like status.
   const { data, error } = await supabase
     .from('posts')
-    .select(`id, user_id, content, song_data, likes_count, comments_count, created_at, author:profiles(${AUTHOR_COLUMNS})`)
+    .select(
+      `id, user_id, content, song_data, mood, likes_count, reaction_counts, comments_count, created_at, author:profiles(${AUTHOR_COLUMNS})`
+    )
     .eq('id', id)
     .maybeSingle();
   if (error) fail(error, 'Could not load post');
   if (!data) return null;
 
   const { data: auth } = await supabase.auth.getUser();
-  let is_liked = false;
+  let my_reaction: ReactionKey | null = null;
   if (auth.user) {
-    const { count } = await supabase
+    const { data: like } = await supabase
       .from('likes')
-      .select('*', { count: 'exact', head: true })
+      .select('kind')
       .eq('post_id', id)
-      .eq('user_id', auth.user.id);
-    is_liked = (count ?? 0) > 0;
+      .eq('user_id', auth.user.id)
+      .maybeSingle();
+    my_reaction = (like?.kind as ReactionKey) ?? null;
   }
-  return { ...(data as unknown as Omit<Post, 'is_liked'>), is_liked };
+  return normalisePost({ ...(data as unknown as Post), my_reaction, top_comment: null });
 }
 
-export async function createPost(userId: string, content: string, song: SongData) {
-  const { error } = await supabase.from('posts').insert({ user_id: userId, content, song_data: song });
+export async function createPost(userId: string, content: string, song: SongData, mood: MoodKey | null) {
+  const { error } = await supabase.from('posts').insert({ user_id: userId, content, song_data: song, mood });
   if (error) fail(error, 'Could not create post');
 }
 
@@ -131,34 +153,51 @@ export async function deletePost(id: string) {
   if (error) fail(error, 'Could not delete post');
 }
 
-export async function likePost(userId: string, postId: string) {
-  const { error } = await supabase.from('likes').insert({ user_id: userId, post_id: postId });
-  if (error && error.code !== '23505') fail(error, 'Could not like post');
+// ---------- Reactions ----------
+
+export async function setReaction(userId: string, postId: string, kind: ReactionKey, hadReaction: boolean) {
+  if (hadReaction) {
+    const { error } = await supabase.from('likes').update({ kind }).eq('user_id', userId).eq('post_id', postId);
+    if (error) fail(error, 'Could not react');
+  } else {
+    const { error } = await supabase.from('likes').insert({ user_id: userId, post_id: postId, kind });
+    if (error && error.code === '23505') {
+      const { error: e2 } = await supabase.from('likes').update({ kind }).eq('user_id', userId).eq('post_id', postId);
+      if (e2) fail(e2, 'Could not react');
+    } else if (error) fail(error, 'Could not react');
+  }
 }
 
-export async function unlikePost(userId: string, postId: string) {
+export async function clearReaction(userId: string, postId: string) {
   const { error } = await supabase.from('likes').delete().eq('user_id', userId).eq('post_id', postId);
-  if (error) fail(error, 'Could not unlike post');
+  if (error) fail(error, 'Could not remove reaction');
 }
 
 // ---------- Comments ----------
 
+const COMMENT_SELECT = `id, post_id, user_id, parent_id, content, created_at, author:profiles(${AUTHOR_COLUMNS})`;
+
 export async function getComments(postId: string): Promise<Comment[]> {
   const { data, error } = await supabase
     .from('comments')
-    .select(`id, post_id, user_id, content, created_at, author:profiles(${AUTHOR_COLUMNS})`)
+    .select(COMMENT_SELECT)
     .eq('post_id', postId)
     .order('created_at', { ascending: true })
-    .limit(200);
+    .limit(500);
   if (error) fail(error, 'Could not load comments');
   return data as unknown as Comment[];
 }
 
-export async function addComment(userId: string, postId: string, content: string): Promise<Comment> {
+export async function addComment(
+  userId: string,
+  postId: string,
+  content: string,
+  parentId: string | null = null
+): Promise<Comment> {
   const { data, error } = await supabase
     .from('comments')
-    .insert({ user_id: userId, post_id: postId, content })
-    .select(`id, post_id, user_id, content, created_at, author:profiles(${AUTHOR_COLUMNS})`)
+    .insert({ user_id: userId, post_id: postId, content, parent_id: parentId })
+    .select(COMMENT_SELECT)
     .single();
   if (error) fail(error, 'Could not post comment');
   return data as unknown as Comment;
@@ -167,6 +206,28 @@ export async function addComment(userId: string, postId: string, content: string
 export async function deleteComment(id: string) {
   const { error } = await supabase.from('comments').delete().eq('id', id);
   if (error) fail(error, 'Could not delete comment');
+}
+
+// ---------- Songs ----------
+
+export async function getTrending(days = 7, limit = 12): Promise<TrackStat[]> {
+  const { data, error } = await supabase.rpc('trending_tracks', { p_days: days, p_limit: limit });
+  if (error) fail(error, 'Could not load trending songs');
+  return (data as TrackStat[]).filter((t) => t.song_data);
+}
+
+export async function searchSongsOnSongSnap(q: string): Promise<TrackStat[]> {
+  if (q.trim().length < 2) return [];
+  const { data, error } = await supabase.rpc('search_tracks', { p_q: q.trim(), p_limit: 20 });
+  if (error) fail(error, 'Search failed');
+  return (data as TrackStat[]).filter((t) => t.song_data);
+}
+
+export async function getTrackSummary(source: MusicSource, trackId: string): Promise<TrackSummary | null> {
+  const { data, error } = await supabase.rpc('track_summary', { p_source: source, p_track_id: trackId });
+  if (error) fail(error, 'Could not load song');
+  const row = (data as TrackSummary[] | null)?.[0];
+  return row && row.song_data ? row : null;
 }
 
 // ---------- Music search (Edge Function) ----------
@@ -185,4 +246,24 @@ export async function searchMusic(q: string, source: MusicSource): Promise<Track
     throw new Error(message || 'Music search failed');
   }
   return (data?.tracks ?? []) as Track[];
+}
+
+export function songLink(song: SongData): string {
+  if (song.external_url) return song.external_url;
+  return song.source === 'youtube'
+    ? `https://www.youtube.com/watch?v=${song.track_id}`
+    : `https://open.spotify.com/track/${song.track_id}`;
+}
+
+export function trackToSong(t: Track): SongData {
+  return {
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    image_url: t.image_url,
+    preview_url: t.preview_url,
+    external_url: t.external_url,
+    source: t.source,
+    track_id: t.id,
+  };
 }

@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { formatDistanceToNow } from 'date-fns';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,12 +16,15 @@ import Avatar from '../../components/Avatar';
 import PostCard, { openProfile } from '../../components/PostCard';
 import { Empty, Header, Loading, Screen } from '../../components/Screen';
 import { addComment, deleteComment, getComments, getPost } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, fonts } from '../../lib/theme';
+import { ago } from '../../lib/time';
 import type { Comment, Post } from '../../lib/types';
 import { confirm, errorMessage, notify } from '../../lib/ui';
 import { useAuth } from '../../store/auth';
 
 const MAX = 300;
+
+type Thread = { root: Comment; replies: Comment[] };
 
 export default function PostScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -34,6 +36,8 @@ export default function PostScreen() {
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
+  const input = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!id || !session) return;
@@ -52,42 +56,57 @@ export default function PostScreen() {
     };
   }, [id, session]);
 
+  const threads = useMemo<Thread[]>(() => {
+    const roots = comments.filter((c) => !c.parent_id);
+    return roots.map((root) => ({ root, replies: comments.filter((c) => c.parent_id === root.id) }));
+  }, [comments]);
+
   if (!session) return <Redirect href="/" />;
+
+  const startReply = (c: Comment) => {
+    setReplyTo(c);
+    input.current?.focus();
+  };
 
   const send = async () => {
     const body = text.trim();
     if (!body || !myId || !post) return;
     setSending(true);
     try {
-      const c = await addComment(myId, post.id, body);
+      const parent = replyTo ? (replyTo.parent_id ?? replyTo.id) : null;
+      const c = await addComment(myId, post.id, body, parent);
       setComments((prev) => [...prev, c]);
       setPost({ ...post, comments_count: post.comments_count + 1 });
       setText('');
+      setReplyTo(null);
     } catch (e) {
-      notify('Could not comment', errorMessage(e));
+      notify("Couldn't post your comment", errorMessage(e));
     } finally {
       setSending(false);
     }
   };
 
   const remove = async (c: Comment) => {
-    if (!(await confirm('Delete comment?', 'This cannot be undone.', 'Delete', true))) return;
+    const replies = comments.filter((x) => x.parent_id === c.id).length;
+    const msg = replies > 0 ? `The ${replies} ${replies === 1 ? 'reply' : 'replies'} under it will go too.` : 'This can’t be undone.';
+    if (!(await confirm('Delete comment?', msg, 'Delete', true))) return;
     try {
       await deleteComment(c.id);
-      setComments((prev) => prev.filter((x) => x.id !== c.id));
-      setPost((p) => (p ? { ...p, comments_count: Math.max(0, p.comments_count - 1) } : p));
+      const gone = new Set([c.id, ...comments.filter((x) => x.parent_id === c.id).map((x) => x.id)]);
+      setComments((prev) => prev.filter((x) => !gone.has(x.id)));
+      setPost((p) => (p ? { ...p, comments_count: Math.max(0, p.comments_count - gone.size) } : p));
     } catch (e) {
-      notify('Error', errorMessage(e));
+      notify("Couldn't delete the comment", errorMessage(e));
     }
   };
 
   return (
     <Screen>
-      <Header title="Post" back />
+      <Header title="Discussion" back />
       {loading ? (
         <Loading />
       ) : error || !post ? (
-        <Empty icon="musical-notes-outline" text={error ?? 'Post not found'} />
+        <Empty emoji="🫥" title="Post not found" text={error ?? 'It may have been deleted.'} />
       ) : (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -95,60 +114,73 @@ export default function PostScreen() {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         >
           <FlatList
-            data={comments}
-            keyExtractor={(c) => c.id}
-            contentContainerStyle={styles.list}
+            data={threads}
+            keyExtractor={(t) => t.root.id}
+            contentContainerStyle={{ paddingBottom: 24 }}
             keyboardShouldPersistTaps="handled"
             ListHeaderComponent={
               <View>
-                <PostCard post={post} linkToComments={false} onDeleted={() => router.back()} />
+                <PostCard post={post} standalone onDeleted={() => router.back()} />
                 <Text style={styles.section}>
-                  {comments.length === 0 ? 'No comments yet' : `Comments (${comments.length})`}
+                  {comments.length === 0 ? 'Start the discussion' : comments.length === 1 ? '1 comment' : `${comments.length} comments`}
                 </Text>
+                {comments.length === 0 && (
+                  <Text style={styles.prompt}>
+                    What does this song mean to you? Got a favourite line, a memory, a better version?
+                  </Text>
+                )}
               </View>
             }
             renderItem={({ item }) => (
-              <View style={styles.comment}>
-                <Pressable onPress={() => openProfile(item.user_id)}>
-                  <Avatar uri={item.author?.profile_pic} name={item.author?.name} size={34} />
-                </Pressable>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.commentMeta}>
-                    <Text style={styles.commentName} onPress={() => openProfile(item.user_id)}>
-                      {item.author?.name}
-                    </Text>
-                    {'  '}
-                    {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                  </Text>
-                  <Text style={styles.commentText}>{item.content}</Text>
-                </View>
-                {item.user_id === myId && (
-                  <Pressable onPress={() => remove(item)} hitSlop={8} accessibilityLabel="Delete comment">
-                    <Ionicons name="trash-outline" size={16} color={colors.textFaint} />
-                  </Pressable>
+              <View style={styles.thread}>
+                <CommentRow c={item.root} myId={myId} onReply={startReply} onDelete={remove} />
+                {item.replies.length > 0 && (
+                  <View style={styles.replies}>
+                    {item.replies.map((r) => (
+                      <CommentRow key={r.id} c={r} myId={myId} onReply={startReply} onDelete={remove} small />
+                    ))}
+                  </View>
                 )}
               </View>
             )}
           />
 
-          <View style={styles.composer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Add a comment…"
-              placeholderTextColor={colors.textFaint}
-              value={text}
-              onChangeText={(t) => setText(t.slice(0, MAX))}
-              onSubmitEditing={send}
-              returnKeyType="send"
-              multiline={false}
-            />
-            {sending ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <Pressable onPress={send} disabled={!text.trim()} hitSlop={8} accessibilityLabel="Send comment">
-                <Ionicons name="send" size={22} color={text.trim() ? colors.accent : colors.textFaint} />
-              </Pressable>
+          <View style={styles.composerWrap}>
+            {replyTo && (
+              <View style={styles.replying}>
+                <Text style={styles.replyingText} numberOfLines={1}>
+                  Replying to <Text style={{ color: colors.ink }}>{replyTo.author?.name}</Text>
+                </Text>
+                <Pressable onPress={() => setReplyTo(null)} hitSlop={8} accessibilityLabel="Cancel reply">
+                  <Ionicons name="close" size={18} color={colors.haze} />
+                </Pressable>
+              </View>
             )}
+            <View style={styles.composer}>
+              <TextInput
+                ref={input}
+                style={styles.input}
+                placeholder={replyTo ? 'Write a reply' : 'Add to the discussion'}
+                placeholderTextColor={colors.dim}
+                value={text}
+                onChangeText={(t) => setText(t.slice(0, MAX))}
+                onSubmitEditing={send}
+                returnKeyType="send"
+              />
+              {sending ? (
+                <ActivityIndicator color={colors.amber} />
+              ) : (
+                <Pressable
+                  onPress={send}
+                  disabled={!text.trim()}
+                  hitSlop={8}
+                  accessibilityLabel="Send"
+                  style={[styles.send, !text.trim() && { opacity: 0.35 }]}
+                >
+                  <Ionicons name="arrow-up" size={20} color={colors.amberInk} />
+                </Pressable>
+              )}
+            </View>
           </View>
         </KeyboardAvoidingView>
       )}
@@ -156,37 +188,72 @@ export default function PostScreen() {
   );
 }
 
+function CommentRow({
+  c,
+  myId,
+  onReply,
+  onDelete,
+  small,
+}: {
+  c: Comment;
+  myId?: string;
+  onReply: (c: Comment) => void;
+  onDelete: (c: Comment) => void;
+  small?: boolean;
+}) {
+  return (
+    <View style={styles.comment}>
+      <Pressable onPress={() => openProfile(c.user_id)} accessibilityLabel={`${c.author?.name}'s profile`}>
+        <Avatar uri={c.author?.profile_pic} name={c.author?.name} size={small ? 28 : 34} />
+      </Pressable>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={styles.commentHead}>
+          <Text style={styles.commentName} onPress={() => openProfile(c.user_id)} numberOfLines={1}>
+            {c.author?.name}
+          </Text>
+          <Text style={styles.commentTime}>{ago(c.created_at)}</Text>
+        </View>
+        <Text style={styles.commentText}>{c.content}</Text>
+        <View style={styles.commentActions}>
+          <Pressable onPress={() => onReply(c)} hitSlop={6}>
+            <Text style={styles.commentAction}>Reply</Text>
+          </Pressable>
+          {c.user_id === myId && (
+            <Pressable onPress={() => onDelete(c)} hitSlop={6}>
+              <Text style={styles.commentAction}>Delete</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  list: { padding: 16 },
-  section: { color: colors.textFaint, fontWeight: '600', fontSize: 14, marginBottom: 12, marginTop: 4 },
-  comment: {
-    flexDirection: 'row',
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  commentMeta: { color: colors.textFaint, fontSize: 12 },
-  commentName: { color: colors.text, fontWeight: '600', fontSize: 14 },
-  commentText: { color: colors.text, fontSize: 15, marginTop: 3, lineHeight: 20 },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
+  section: { color: colors.ink, fontFamily: fonts.displaySemi, fontSize: 15, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 6 },
+  prompt: { color: colors.haze, fontFamily: fonts.body, fontSize: 14.5, lineHeight: 21, paddingHorizontal: 16 },
+  thread: { paddingHorizontal: 16, paddingTop: 12 },
+  replies: { marginLeft: 16, paddingLeft: 16, borderLeftWidth: 2, borderLeftColor: colors.line, marginTop: 2 },
+  comment: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
+  commentHead: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  commentName: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 14.5, flexShrink: 1 },
+  commentTime: { color: colors.dim, fontFamily: fonts.body, fontSize: 12.5 },
+  commentText: { color: colors.ink, fontFamily: fonts.body, fontSize: 15, lineHeight: 21, marginTop: 2 },
+  commentActions: { flexDirection: 'row', gap: 18, marginTop: 6 },
+  commentAction: { color: colors.dim, fontFamily: fonts.bodySemi, fontSize: 13 },
+  composerWrap: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line, backgroundColor: colors.stage },
+  replying: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 10 },
+  replyingText: { color: colors.haze, fontFamily: fonts.body, fontSize: 13, flex: 1 },
+  composer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 10 },
   input: {
     flex: 1,
-    color: colors.text,
+    color: colors.ink,
     fontSize: 15,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 20,
+    fontFamily: fonts.body,
+    backgroundColor: colors.booth,
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 11,
   },
+  send: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.amber, alignItems: 'center', justifyContent: 'center' },
 });

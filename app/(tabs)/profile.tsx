@@ -5,8 +5,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/Button';
 import PostList from '../../components/PostList';
 import ProfileHeader from '../../components/ProfileHeader';
-import { Header, Loading, Screen } from '../../components/Screen';
-import { colors } from '../../lib/theme';
+import { Empty, Header, Loading, Screen } from '../../components/Screen';
+import { colors, fonts } from '../../lib/theme';
 import { confirm, errorMessage, notify } from '../../lib/ui';
 import { useAuth } from '../../store/auth';
 
@@ -15,10 +15,11 @@ export default function MyProfileScreen() {
   const signOut = useAuth((s) => s.signOut);
   const upgradeGuest = useAuth((s) => s.upgradeGuest);
   const [upgrading, setUpgrading] = useState(false);
+  const [glow, setGlow] = useState<string | null>(null);
 
   const logout = async () => {
     const warn = profile?.is_guest
-      ? 'Guest accounts cannot be recovered after signing out. Save it with Google first to keep your posts.'
+      ? "Guest accounts can't be recovered after signing out. Save it with Google first to keep your posts."
       : 'You can sign back in any time.';
     if (await confirm('Sign out?', warn, 'Sign out', true)) {
       await signOut();
@@ -31,7 +32,7 @@ export default function MyProfileScreen() {
     try {
       await upgradeGuest();
     } catch (e) {
-      notify('Could not link Google', errorMessage(e));
+      notify("Couldn't link Google", errorMessage(e));
     } finally {
       setUpgrading(false);
     }
@@ -40,7 +41,7 @@ export default function MyProfileScreen() {
   if (!profile) {
     return (
       <Screen>
-        <Header title="Profile" />
+        <Header title="You" />
         <Loading />
       </Screen>
     );
@@ -49,36 +50,46 @@ export default function MyProfileScreen() {
   return (
     <Screen>
       <Header
-        title="Profile"
+        title="You"
         right={
           <Pressable onPress={logout} hitSlop={10} accessibilityLabel="Sign out">
-            <Ionicons name="log-out-outline" size={24} color={colors.danger} />
+            <Ionicons name="log-out-outline" size={23} color={colors.haze} />
           </Pressable>
         }
       />
       <PostList
-        scope="user"
-        userId={profile.id}
-        emptyText="You haven't shared anything yet"
+        query={{ scope: 'user', userId: profile.id }}
+        onFirstPost={(p) => setGlow(p?.song_data.image_url ?? null)}
+        empty={
+          <Empty
+            emoji="🎙️"
+            title="Your stage is waiting"
+            text="Share a song and tell people what it means to you."
+            action={<Button title="Share a song" onPress={() => router.navigate('/(tabs)/create')} style={{ marginTop: 10 }} />}
+          />
+        }
         header={
           <View>
             <ProfileHeader
               profile={profile}
-              actions={<Button title="Edit profile" variant="ghost" onPress={() => router.push('/edit-profile')} style={{ flex: 1 }} />}
+              glowUri={glow}
+              actions={
+                <Button
+                  title="Edit profile"
+                  variant="quiet"
+                  onPress={() => router.push('/edit-profile')}
+                  style={{ flex: 1, maxWidth: 240, backgroundColor: 'rgba(255,255,255,0.14)' }}
+                />
+              }
             />
             {profile.is_guest && (
               <View style={styles.guest}>
-                <Ionicons name="alert-circle-outline" size={22} color={colors.accent} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.guestTitle}>You're using a guest account</Text>
-                  <Text style={styles.guestText}>Link Google to keep your posts and sign in on other devices.</Text>
-                </View>
+                <Text style={styles.guestTitle}>You're using a guest account</Text>
+                <Text style={styles.guestText}>Link Google to keep your posts and sign in on other devices.</Text>
+                <Button title="Save account with Google" onPress={upgrade} loading={upgrading} style={{ marginTop: 12 }} />
               </View>
             )}
-            {profile.is_guest && (
-              <Button title="Save account with Google" onPress={upgrade} loading={upgrading} style={{ marginBottom: 16 }} />
-            )}
-            <Text style={styles.section}>Your posts</Text>
+            <Text style={styles.section}>Songs you've shared</Text>
           </View>
         }
       />
@@ -88,17 +99,22 @@ export default function MyProfileScreen() {
 
 const styles = StyleSheet.create({
   guest: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
+    margin: 16,
+    marginBottom: 0,
+    backgroundColor: colors.booth,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: colors.accent,
+    borderColor: colors.amber,
   },
-  guestTitle: { color: colors.text, fontWeight: '600', fontSize: 15 },
-  guestText: { color: colors.textMuted, fontSize: 13, marginTop: 2 },
-  section: { color: colors.textFaint, fontWeight: '600', fontSize: 14, marginBottom: 10 },
+  guestTitle: { color: colors.ink, fontFamily: fonts.bodyBold, fontSize: 15.5 },
+  guestText: { color: colors.haze, fontFamily: fonts.body, fontSize: 14, marginTop: 4, lineHeight: 20 },
+  section: {
+    color: colors.ink,
+    fontFamily: fonts.displaySemi,
+    fontSize: 15,
+    paddingHorizontal: 16,
+    paddingTop: 22,
+    paddingBottom: 4,
+  },
 });

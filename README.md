@@ -20,8 +20,10 @@ supabase/functions/music-search/   Spotify + YouTube search (keeps API keys serv
 ## 1. Supabase project
 
 1. Create a project at supabase.com.
-2. **SQL Editor** → paste `supabase/migrations/20261010000000_init.sql` → Run.
-   (Or with the CLI: `supabase link --project-ref <ref>` then `supabase db push`.)
+2. **SQL Editor** → run each file in `supabase/migrations/` in order:
+   - `20261010000000_init.sql` (tables, security, counters)
+   - `20261011000000_social.sql` (moods, reactions, threaded replies, trending, song pages)
+   (Or with the CLI: `npx supabase link --project-ref <ref>` then `npx supabase db push`.)
 
 ## 2. Auth
 
@@ -85,6 +87,15 @@ npm i -g eas-cli
 eas build -p android    # or -p ios
 ```
 Add the two `EXPO_PUBLIC_*` variables as EAS environment variables first.
+
+## Features
+
+- **Feed**: Everyone / Following, filter by mood, "Spinning this week" trending strip.
+- **Posts**: a song plus what it means to you, tagged with a moment (Late night, Gym, Heartbreak…). Each song panel glows with its own album art.
+- **Reactions**: Fire, Love it, On repeat, In my feels, Vibing. One per person, switchable.
+- **Discussion**: threaded replies on every post, latest comment previewed in the feed.
+- **Song pages**: everyone's posts about one song, who's sharing it, its most common mood, "Share your take".
+- **Discover**: most-talked-about songs, search songs people have posted, find people.
 
 ## What changed from the Emergent version
 

@@ -5,7 +5,7 @@ import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import { Header, Loading, Screen } from '../components/Screen';
 import { updateProfile } from '../lib/api';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 import { errorMessage, notify } from '../lib/ui';
 import { useAuth } from '../store/auth';
 
@@ -123,7 +123,7 @@ function Field({
           autoCapitalize={prefix || placeholder ? 'none' : 'sentences'}
           autoCorrect={!prefix && !placeholder}
           placeholder={placeholder}
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={colors.dim}
         />
       </View>
     </View>
@@ -134,15 +134,15 @@ const styles = StyleSheet.create({
   body: { padding: 16 },
   field: { marginBottom: 16 },
   labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  label: { color: colors.text, fontWeight: '600', fontSize: 15 },
-  count: { color: colors.textFaint, fontSize: 12 },
+  label: { color: colors.ink, fontFamily: fonts.bodySemi, fontSize: 15 },
+  count: { color: colors.dim, fontSize: 12 },
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
+    backgroundColor: colors.booth,
+    borderRadius: 14,
     paddingHorizontal: 14,
   },
-  prefix: { color: colors.textFaint, fontSize: 16, marginRight: 2 },
-  input: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 14 },
+  prefix: { color: colors.dim, fontSize: 16, marginRight: 2 },
+  input: { flex: 1, color: colors.ink, fontSize: 16, fontFamily: fonts.body, paddingVertical: 14 },
 });

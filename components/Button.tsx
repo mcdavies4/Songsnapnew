@@ -1,35 +1,41 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
-import { colors } from '../lib/theme';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { colors, fonts } from '../lib/theme';
 
 type Props = {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline' | 'ghost';
+  variant?: 'primary' | 'outline' | 'quiet';
   loading?: boolean;
   disabled?: boolean;
+  icon?: ReactNode;
   style?: ViewStyle;
 };
 
-export default function Button({ title, onPress, variant = 'primary', loading, disabled, style }: Props) {
+export default function Button({ title, onPress, variant = 'primary', loading, disabled, icon, style }: Props) {
   const off = disabled || loading;
   return (
     <Pressable
       onPress={onPress}
       disabled={off}
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.base,
         variant === 'primary' && styles.primary,
         variant === 'outline' && styles.outline,
-        variant === 'ghost' && styles.ghost,
-        off && styles.disabled,
-        pressed && !off && { opacity: 0.8 },
+        variant === 'quiet' && styles.quiet,
+        off && (variant === 'primary' ? styles.disabledPrimary : styles.disabled),
+        pressed && !off && styles.pressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? colors.bg : colors.accent} />
+        <ActivityIndicator color={variant === 'primary' ? colors.amberInk : colors.amber} />
       ) : (
-        <Text style={[styles.text, variant !== 'primary' && styles.textAlt]}>{title}</Text>
+        <View style={styles.row}>
+          {icon}
+          <Text style={[styles.text, variant !== 'primary' && styles.textAlt, off && variant === 'primary' && styles.textOff]}>{title}</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -37,17 +43,21 @@ export default function Button({ title, onPress, variant = 'primary', loading, d
 
 const styles = StyleSheet.create({
   base: {
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 30,
+    paddingHorizontal: 22,
+    paddingVertical: 13,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
+    minHeight: 48,
   },
-  primary: { backgroundColor: colors.accent },
-  outline: { borderWidth: 2, borderColor: colors.accent },
-  ghost: { backgroundColor: colors.surfaceAlt },
-  disabled: { opacity: 0.45 },
-  text: { color: colors.bg, fontSize: 16, fontWeight: '700' },
-  textAlt: { color: colors.accent },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  primary: { backgroundColor: colors.amber },
+  outline: { borderWidth: 1.5, borderColor: colors.amber },
+  quiet: { backgroundColor: colors.riser },
+  disabled: { opacity: 0.4 },
+  disabledPrimary: { backgroundColor: colors.riser },
+  textOff: { color: colors.dim },
+  pressed: { transform: [{ scale: 0.98 }], opacity: 0.9 },
+  text: { color: colors.amberInk, fontSize: 16, fontFamily: fonts.bodyBold },
+  textAlt: { color: colors.ink },
 });

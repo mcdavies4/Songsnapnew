@@ -1,22 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
-import { formatDistanceToNow } from 'date-fns';
-import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { memo, useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { deletePost, likePost, unlikePost } from '../lib/api';
-import { subscribe, togglePreview } from '../lib/audio';
-import { colors } from '../lib/theme';
+import { memo, useState } from 'react';
+import { Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { deletePost, songLink } from '../lib/api';
+import { colors, fonts } from '../lib/theme';
+import { ago } from '../lib/time';
 import type { Post } from '../lib/types';
 import { confirm, errorMessage, notify } from '../lib/ui';
 import { useAuth } from '../store/auth';
 import Avatar from './Avatar';
-import SourceIcon from './SourceIcon';
+import MoodChip from './MoodChip';
+import { ReactButton, ReactionPicker, ReactionSummary, useReaction } from './Reactions';
+import Sleeve from './Sleeve';
 
 type Props = {
   post: Post;
   onDeleted?: (id: string) => void;
-  linkToComments?: boolean;
+  /** On the post page itself we don't link to it or show the comment preview. */
+  standalone?: boolean;
 };
 
 export function openProfile(userId: string) {
@@ -25,138 +26,124 @@ export function openProfile(userId: string) {
   else router.push(`/user/${userId}`);
 }
 
-function externalUrl(post: Post) {
-  const s = post.song_data;
-  if (s.external_url) return s.external_url;
-  return s.source === 'youtube'
-    ? `https://www.youtube.com/watch?v=${s.track_id}`
-    : `https://open.spotify.com/track/${s.track_id}`;
+export async function sharePost(post: Post) {
+  const url = Platform.OS === 'web' ? `${window.location.origin}/post/${post.id}` : songLink(post.song_data);
+  const message = `${post.song_data.title} by ${post.song_data.artist} on SongSnap`;
+  try {
+    if (Platform.OS === 'web') {
+      if (navigator.share) await navigator.share({ title: message, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        notify('Link copied');
+      }
+    } else {
+      await Share.share({ message: `${message}\n${url}` });
+    }
+  } catch {
+    /* user cancelled */
+  }
 }
 
-function PostCard({ post, onDeleted, linkToComments = true }: Props) {
+function PostCard({ post, onDeleted, standalone = false }: Props) {
   const myId = useAuth((s) => s.session?.user.id);
-  const [liked, setLiked] = useState(post.is_liked);
-  const [likes, setLikes] = useState(post.likes_count);
-  const [busy, setBusy] = useState(false);
-  const [playing, setPlaying] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const r = useReaction(myId, post.id, {
+    mine: post.my_reaction,
+    counts: post.reaction_counts,
+    total: post.likes_count,
+  });
 
-  useEffect(() => {
-    setLiked(post.is_liked);
-    setLikes(post.likes_count);
-  }, [post.is_liked, post.likes_count]);
-
-  useEffect(() => subscribe((key) => setPlaying(key === post.id)), [post.id]);
-
-  const song = post.song_data;
-  // Old YouTube posts stored the watch URL as preview_url; only real audio files are playable.
-  const preview = song.source === 'spotify' && song.preview_url ? song.preview_url : null;
-
-  const toggleLike = async () => {
-    if (!myId || busy) return;
-    const next = !liked;
-    setBusy(true);
-    setLiked(next);
-    setLikes((n) => n + (next ? 1 : -1));
-    try {
-      if (next) await likePost(myId, post.id);
-      else await unlikePost(myId, post.id);
-    } catch (e) {
-      setLiked(!next);
-      setLikes((n) => n + (next ? -1 : 1));
-      notify('Error', errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const openPost = () => router.push(`/post/${post.id}`);
 
   const remove = async () => {
-    if (!(await confirm('Delete post', 'This cannot be undone.', 'Delete', true))) return;
+    if (!(await confirm('Delete this post?', 'The post and its discussion will be removed.', 'Delete', true))) return;
     try {
       await deletePost(post.id);
       onDeleted?.(post.id);
     } catch (e) {
-      notify('Error', errorMessage(e));
+      notify("Couldn't delete the post", errorMessage(e));
     }
   };
 
-  const play = () => {
-    if (preview) togglePreview(post.id, preview).catch(() => notify('Error', 'Could not play preview'));
-    else Linking.openURL(externalUrl(post));
-  };
-
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <Pressable style={styles.author} onPress={() => openProfile(post.user_id)}>
-          <Avatar uri={post.author?.profile_pic} name={post.author?.name} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name} numberOfLines={1}>
-              {post.author?.name}
-            </Text>
-            <Text style={styles.meta} numberOfLines={1}>
-              @{post.author?.username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-            </Text>
-          </View>
+    <View style={styles.item}>
+      <View style={styles.head}>
+        <Pressable onPress={() => openProfile(post.user_id)} accessibilityLabel={`${post.author?.name}'s profile`}>
+          <Avatar uri={post.author?.profile_pic} name={post.author?.name} size={42} />
         </Pressable>
+        <Pressable style={styles.who} onPress={() => openProfile(post.user_id)}>
+          <Text style={styles.name} numberOfLines={1}>
+            {post.author?.name}
+          </Text>
+          <Text style={styles.handle} numberOfLines={1}>
+            @{post.author?.username}
+          </Text>
+        </Pressable>
+        <Text style={styles.time}>{ago(post.created_at)}</Text>
         {post.user_id === myId && (
-          <Pressable hitSlop={10} onPress={remove} accessibilityLabel="Delete post">
-            <Ionicons name="trash-outline" size={20} color={colors.textFaint} />
+          <Pressable hitSlop={10} onPress={remove} accessibilityLabel="Delete post" style={{ marginLeft: 4 }}>
+            <Ionicons name="trash-outline" size={17} color={colors.dim} />
           </Pressable>
         )}
       </View>
 
-      {!!post.content && <Text style={styles.content}>{post.content}</Text>}
+      {!!post.content && (
+        <Pressable onPress={standalone ? undefined : openPost} disabled={standalone}>
+          <Text style={[styles.caption, standalone && styles.captionLarge]}>{post.content}</Text>
+        </Pressable>
+      )}
 
-      <View style={styles.song}>
-        <Image
-          source={song.image_url ? { uri: song.image_url } : require('../assets/images/icon.png')}
-          style={styles.art}
-          contentFit="cover"
-        />
-        <View style={styles.songInfo}>
-          <Text style={styles.songTitle} numberOfLines={1}>
-            {song.title}
-          </Text>
-          <Text style={styles.songArtist} numberOfLines={1}>
-            {song.artist}
-          </Text>
-          {!!song.album && (
-            <Text style={styles.songAlbum} numberOfLines={1}>
-              {song.album}
-            </Text>
-          )}
-          <Pressable
-            onPress={() => Linking.openURL(externalUrl(post))}
-            style={[styles.badge, song.source === 'youtube' && styles.badgeYt]}
-          >
-            <SourceIcon source={song.source} size={11} color="#fff" />
-            <Text style={styles.badgeText}>{song.source === 'youtube' ? 'YouTube' : 'Spotify'}</Text>
-          </Pressable>
+      <Sleeve song={post.song_data} playKey={post.id} />
+
+      {!!post.mood && (
+        <View style={styles.moodRow}>
+          <MoodChip mood={post.mood} size="sm" onPress={() => router.push({ pathname: '/(tabs)', params: { mood: post.mood! } })} />
         </View>
-        <Pressable onPress={play} hitSlop={8} accessibilityLabel={preview ? 'Play preview' : 'Open song'}>
-          <Ionicons
-            name={preview ? (playing ? 'pause-circle' : 'play-circle') : 'open-outline'}
-            size={preview ? 48 : 26}
-            color={colors.accent}
-          />
-        </Pressable>
-      </View>
+      )}
 
-      <View style={styles.actions}>
-        <Pressable style={styles.action} onPress={toggleLike} hitSlop={6} accessibilityLabel={liked ? 'Unlike' : 'Like'}>
-          <Ionicons name={liked ? 'heart' : 'heart-outline'} size={24} color={liked ? colors.danger : colors.text} />
-          <Text style={styles.actionText}>{likes}</Text>
-        </Pressable>
+      <View style={styles.bar}>
+        <ReactButton mine={r.mine} onPress={() => setPicking((v) => !v)} />
         <Pressable
           style={styles.action}
+          onPress={standalone ? undefined : openPost}
+          disabled={standalone}
           hitSlop={6}
-          onPress={linkToComments ? () => router.push(`/post/${post.id}`) : undefined}
-          accessibilityLabel="Comments"
+          accessibilityLabel={`${post.comments_count} comments`}
         >
-          <Ionicons name="chatbubble-outline" size={22} color={colors.text} />
-          <Text style={styles.actionText}>{post.comments_count}</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={19} color={colors.haze} />
+          <Text style={styles.actionText}>{post.comments_count > 0 ? post.comments_count : 'Discuss'}</Text>
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <ReactionSummary counts={r.counts} total={r.total} />
+        <Pressable onPress={() => sharePost(post)} hitSlop={8} accessibilityLabel="Share" style={{ marginLeft: 14 }}>
+          <Ionicons name="paper-plane-outline" size={19} color={colors.haze} />
         </Pressable>
       </View>
+
+      {picking && (
+        <ReactionPicker
+          mine={r.mine}
+          onPick={(k) => {
+            r.apply(k);
+            setPicking(false);
+          }}
+        />
+      )}
+
+      {!standalone && post.top_comment && (
+        <Pressable style={styles.preview} onPress={openPost}>
+          <Avatar uri={post.top_comment.author?.profile_pic} name={post.top_comment.author?.name} size={24} />
+          <Text style={styles.previewText} numberOfLines={2}>
+            <Text style={styles.previewName}>{post.top_comment.author?.name} </Text>
+            {post.top_comment.content}
+          </Text>
+        </Pressable>
+      )}
+      {!standalone && post.comments_count > 1 && (
+        <Pressable onPress={openPost} hitSlop={4}>
+          <Text style={styles.more}>View all {post.comments_count} comments</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -164,40 +151,34 @@ function PostCard({ post, onDeleted, linkToComments = true }: Props) {
 export default memo(PostCard);
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.surface, padding: 16, marginBottom: 12, borderRadius: 12 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
-  author: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  name: { color: colors.text, fontSize: 16, fontWeight: '600' },
-  meta: { color: colors.textFaint, fontSize: 12, marginTop: 2 },
-  content: { color: colors.text, fontSize: 15, lineHeight: 21, marginBottom: 12 },
-  song: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    gap: 12,
+  item: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
   },
-  art: { width: 72, height: 72, borderRadius: 8, backgroundColor: colors.bg },
-  songInfo: { flex: 1, justifyContent: 'center' },
-  songTitle: { color: colors.text, fontSize: 16, fontWeight: '600', marginBottom: 2 },
-  songArtist: { color: colors.textMuted, fontSize: 14, marginBottom: 2 },
-  songAlbum: { color: colors.textFaint, fontSize: 12, marginBottom: 4 },
-  badge: {
-    alignSelf: 'flex-start',
+  head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  who: { flex: 1, minWidth: 0 },
+  name: { color: colors.ink, fontSize: 15.5, fontFamily: fonts.bodyBold },
+  handle: { color: colors.dim, fontSize: 13, fontFamily: fonts.body, marginTop: 1 },
+  time: { color: colors.dim, fontSize: 13, fontFamily: fonts.bodyMedium },
+  caption: { color: colors.ink, fontSize: 16, lineHeight: 23, fontFamily: fonts.body, marginBottom: 12 },
+  captionLarge: { fontSize: 18, lineHeight: 26 },
+  moodRow: { marginTop: 10, marginLeft: -2 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 10 },
+  action: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4 },
+  actionText: { color: colors.haze, fontSize: 14, fontFamily: fonts.bodySemi },
+  preview: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.accent,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    marginTop: 2,
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.line,
   },
-  badgeYt: { backgroundColor: colors.youtube },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  actions: { flexDirection: 'row', gap: 24 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  actionText: { color: colors.text, fontSize: 14 },
+  previewText: { flex: 1, color: colors.haze, fontSize: 14, lineHeight: 20, fontFamily: fonts.body },
+  previewName: { color: colors.ink, fontFamily: fonts.bodySemi },
+  more: { color: colors.amber, fontSize: 13.5, fontFamily: fonts.bodySemi, marginTop: 8, marginLeft: 34 },
 });

@@ -5,8 +5,12 @@ import { Empty, Screen } from '../components/Screen';
 export default function NotFound() {
   return (
     <Screen>
-      <Empty icon="musical-notes-outline" text="This page doesn't exist." />
-      <Button title="Go home" onPress={() => router.replace('/')} style={{ alignSelf: 'center' }} />
+      <Empty
+        emoji="🎚️"
+        title="Nothing playing here"
+        text="This page doesn't exist."
+        action={<Button title="Go to the feed" onPress={() => router.replace('/')} style={{ marginTop: 10 }} />}
+      />
     </Screen>
   );
 }
