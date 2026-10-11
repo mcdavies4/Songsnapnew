@@ -74,12 +74,13 @@ export default function PostList({ query, empty, header, onRefresh, onFirstPost 
   };
 
   const onDeleted = useCallback((id: string) => setPosts((prev) => prev.filter((p) => p.id !== id)), []);
+  const onBlocked = useCallback((userId: string) => setPosts((prev) => prev.filter((p) => p.user_id !== userId)), []);
 
   return (
     <FlatList
       data={posts}
       keyExtractor={(p) => p.id}
-      renderItem={({ item }) => <PostCard post={item} onDeleted={onDeleted} />}
+      renderItem={({ item }) => <PostCard post={item} onDeleted={onDeleted} onBlocked={onBlocked} />}
       ListHeaderComponent={header}
       contentContainerStyle={styles.content}
       onEndReached={loadMore}

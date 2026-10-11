@@ -21,6 +21,8 @@ import { ago } from '../../lib/time';
 import type { Comment, Post } from '../../lib/types';
 import { confirm, errorMessage, notify } from '../../lib/ui';
 import { useAuth } from '../../store/auth';
+import { showSheet } from '../../components/ActionSheet';
+import { blockFlow, getBlockedIds, reportFlow } from '../../lib/safety';
 
 const MAX = 300;
 
@@ -42,12 +44,12 @@ export default function PostScreen() {
   useEffect(() => {
     if (!id || !session) return;
     let alive = true;
-    Promise.all([getPost(id), getComments(id)])
-      .then(([p, c]) => {
+    Promise.all([getPost(id), getComments(id), getBlockedIds()])
+      .then(([p, c, blocked]) => {
         if (!alive) return;
         if (!p) setError('This post was deleted');
         setPost(p);
-        setComments(c);
+        setComments(c.filter((x) => !blocked.has(x.user_id)));
       })
       .catch((e) => alive && setError(errorMessage(e)))
       .finally(() => alive && setLoading(false));
@@ -100,6 +102,26 @@ export default function PostScreen() {
     }
   };
 
+  const hide = (ids: (c: Comment) => boolean) => setComments((prev) => prev.filter((x) => !ids(x)));
+
+  const commentMenu = (c: Comment) => {
+    if (!myId) return;
+    if (c.user_id === myId) {
+      showSheet('Your comment', [{ label: 'Delete comment', destructive: true, onPress: () => remove(c) }]);
+      return;
+    }
+    const name = c.author?.name ?? 'this person';
+    showSheet(`Comment by ${name}`, [
+      { label: 'Report comment', onPress: () => reportFlow(myId, 'comment', { commentId: c.id }, () => hide((x) => x.id === c.id || x.parent_id === c.id)) },
+      {
+        label: `Block ${name}`,
+        destructive: true,
+        hint: "Hide everything they post. They won't be told.",
+        onPress: () => blockFlow(myId, { id: c.user_id, name }, () => hide((x) => x.user_id === c.user_id)),
+      },
+    ]);
+  };
+
   return (
     <Screen>
       <Header title="Discussion" back />
@@ -133,11 +155,11 @@ export default function PostScreen() {
             }
             renderItem={({ item }) => (
               <View style={styles.thread}>
-                <CommentRow c={item.root} myId={myId} onReply={startReply} onDelete={remove} />
+                <CommentRow c={item.root} onReply={startReply} onMore={commentMenu} />
                 {item.replies.length > 0 && (
                   <View style={styles.replies}>
                     {item.replies.map((r) => (
-                      <CommentRow key={r.id} c={r} myId={myId} onReply={startReply} onDelete={remove} small />
+                      <CommentRow key={r.id} c={r} onReply={startReply} onMore={commentMenu} small />
                     ))}
                   </View>
                 )}
@@ -190,15 +212,13 @@ export default function PostScreen() {
 
 function CommentRow({
   c,
-  myId,
   onReply,
-  onDelete,
+  onMore,
   small,
 }: {
   c: Comment;
-  myId?: string;
   onReply: (c: Comment) => void;
-  onDelete: (c: Comment) => void;
+  onMore: (c: Comment) => void;
   small?: boolean;
 }) {
   return (
@@ -218,11 +238,9 @@ function CommentRow({
           <Pressable onPress={() => onReply(c)} hitSlop={6}>
             <Text style={styles.commentAction}>Reply</Text>
           </Pressable>
-          {c.user_id === myId && (
-            <Pressable onPress={() => onDelete(c)} hitSlop={6}>
-              <Text style={styles.commentAction}>Delete</Text>
-            </Pressable>
-          )}
+          <Pressable onPress={() => onMore(c)} hitSlop={6} accessibilityLabel="More options">
+            <Text style={styles.commentAction}>More</Text>
+          </Pressable>
         </View>
       </View>
     </View>

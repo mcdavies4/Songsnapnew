@@ -2,11 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { showSheet } from '../../components/ActionSheet';
 import Button from '../../components/Button';
 import PostList from '../../components/PostList';
 import ProfileHeader from '../../components/ProfileHeader';
 import { Empty, Header, Loading, Screen } from '../../components/Screen';
 import { colors, fonts } from '../../lib/theme';
+import { deleteAccountFlow } from '../../lib/safety';
 import { confirm, errorMessage, notify } from '../../lib/ui';
 import { useAuth } from '../../store/auth';
 
@@ -38,6 +40,20 @@ export default function MyProfileScreen() {
     }
   };
 
+  const openSettings = () =>
+    showSheet('Account', [
+      { label: 'Edit profile', onPress: () => router.push('/edit-profile') },
+      { label: 'Terms and community guidelines', onPress: () => router.push('/terms') },
+      { label: 'Privacy policy', onPress: () => router.push('/privacy') },
+      { label: 'Sign out', onPress: logout },
+      {
+        label: 'Delete account',
+        destructive: true,
+        hint: 'Permanently removes your profile and everything you posted.',
+        onPress: () => deleteAccountFlow(signOut),
+      },
+    ]);
+
   if (!profile) {
     return (
       <Screen>
@@ -52,8 +68,8 @@ export default function MyProfileScreen() {
       <Header
         title="You"
         right={
-          <Pressable onPress={logout} hitSlop={10} accessibilityLabel="Sign out">
-            <Ionicons name="log-out-outline" size={23} color={colors.haze} />
+          <Pressable onPress={openSettings} hitSlop={10} accessibilityLabel="Account settings">
+            <Ionicons name="settings-outline" size={22} color={colors.haze} />
           </Pressable>
         }
       />

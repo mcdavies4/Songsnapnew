@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SheetHost } from '../components/ActionSheet';
 import { configError } from '../lib/supabase';
 import { colors } from '../lib/theme';
 import { useAuth } from '../store/auth';
@@ -72,6 +73,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <StatusBar style="light" />
         {body}
+        <SheetHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

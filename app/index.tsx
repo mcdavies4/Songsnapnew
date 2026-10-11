@@ -1,6 +1,7 @@
-import { Redirect } from 'expo-router';
-import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { Redirect, router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import Equalizer from '../components/Equalizer';
@@ -18,14 +19,21 @@ export default function Welcome() {
   const session = useAuth((s) => s.session);
   const signInWithGoogle = useAuth((s) => s.signInWithGoogle);
   const signInAsGuest = useAuth((s) => s.signInAsGuest);
-  const [busy, setBusy] = useState<'google' | 'guest' | null>(null);
+  const signInWithApple = useAuth((s) => s.signInWithApple);
+  const [busy, setBusy] = useState<'google' | 'guest' | 'apple' | null>(null);
+  const [appleReady, setAppleReady] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') AppleAuthentication.isAvailableAsync().then(setAppleReady).catch(() => {});
+  }, []);
 
   if (session) return <Redirect href="/(tabs)" />;
 
-  const run = async (which: 'google' | 'guest') => {
+  const run = async (which: 'google' | 'guest' | 'apple') => {
     setBusy(which);
     try {
       if (which === 'google') await signInWithGoogle();
+      else if (which === 'apple') await signInWithApple();
       else await signInAsGuest();
     } catch (e) {
       notify("Couldn't sign you in", errorMessage(e));
@@ -56,6 +64,15 @@ export default function Welcome() {
         </View>
 
         <View style={styles.buttons}>
+          {appleReady && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+              cornerRadius={999}
+              style={styles.apple}
+              onPress={() => !busy && run('apple')}
+            />
+          )}
           <Button title="Continue with Google" onPress={() => run('google')} loading={busy === 'google'} disabled={!!busy} />
           <Button
             title="Look around as a guest"
@@ -65,6 +82,17 @@ export default function Welcome() {
             disabled={!!busy}
           />
           <Text style={styles.hint}>Guests can save their account with Google later and keep their posts.</Text>
+          <Text style={styles.terms}>
+            By continuing you agree to the{' '}
+            <Text style={styles.termsLink} onPress={() => router.push('/terms')} accessibilityRole="link">
+              terms and community guidelines
+            </Text>
+            , and to our{' '}
+            <Text style={styles.termsLink} onPress={() => router.push('/privacy')} accessibilityRole="link">
+              privacy policy
+            </Text>
+            .
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -83,5 +111,8 @@ const styles = StyleSheet.create({
   pointEmoji: { fontSize: 20, width: 28 },
   pointText: { flex: 1, color: colors.haze, fontFamily: fonts.body, fontSize: 16, lineHeight: 23 },
   buttons: { marginTop: 40, gap: 12 },
+  apple: { height: 50, width: '100%' },
+  terms: { color: colors.dim, fontFamily: fonts.body, fontSize: 13, textAlign: 'center', lineHeight: 19, marginTop: 8 },
+  termsLink: { color: colors.haze, fontFamily: fonts.bodySemi, textDecorationLine: 'underline' },
   hint: { color: colors.dim, fontFamily: fonts.body, fontSize: 13, textAlign: 'center', marginTop: 4, lineHeight: 19 },
 });

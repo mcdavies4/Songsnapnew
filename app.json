@@ -2,24 +2,34 @@
   "expo": {
     "name": "SongSnap",
     "slug": "songsnap",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "songsnap",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "backgroundColor": "#0a0a0a",
+    "backgroundColor": "#151021",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.songsnap.app"
+      "bundleIdentifier": "com.the36thcompany.songsnap",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": true
     },
     "android": {
+      "package": "com.the36thcompany.songsnap",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#0a0a0a"
+        "backgroundColor": "#151021"
       },
-      "package": "com.songsnap.app",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -28,14 +38,31 @@
       "name": "SongSnap",
       "shortName": "SongSnap",
       "description": "Share what you're listening to.",
-      "themeColor": "#0a0a0a",
-      "backgroundColor": "#0a0a0a"
+      "themeColor": "#151021",
+      "backgroundColor": "#151021"
     },
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-audio",
-      "expo-font"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/adaptive-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#151021"
+        }
+      ],
+      "expo-asset",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": false

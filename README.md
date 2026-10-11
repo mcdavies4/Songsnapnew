@@ -80,13 +80,26 @@ Cloudflare serves `index.html` for unknown paths, so deep links like `/post/<id>
 
 **Vercel** – same build command and output directory; `vercel.json` handles the SPA rewrites.
 
-## 6. Mobile builds
+## 6. Mobile apps (iOS + Android)
 
-```bash
-npm i -g eas-cli
-eas build -p android    # or -p ios
-```
-Add the two `EXPO_PUBLIC_*` variables as EAS environment variables first.
+Built in the cloud with EAS: no Mac or Android Studio needed, works from Windows.
+
+**One-time setup**
+1. `npm i -g eas-cli` then `eas login` (free account at expo.dev).
+2. `eas init`: links the project and adds a `projectId` to `app.json`.
+3. In `eas.json`, replace the two placeholder values under `build.base.env` with your Supabase URL and anon key.
+4. Supabase → Authentication → URL Configuration → add `songsnap://auth-callback` to Redirect URLs.
+5. Run `supabase/migrations/20261012000000_safety.sql` (block, report, delete account).
+
+**Test on your Android phone**: `eas build -p android --profile preview` → open the link on your phone and install the APK.
+
+**Google Play**: Play Console account ($25 one-off) → `eas build -p android --profile production` → `eas submit -p android`.
+
+**App Store**: Apple Developer Program ($99/year) → `eas build -p ios --profile production` (EAS creates certificates for you) → `eas submit -p ios`.
+- Sign in with Apple: in Supabase → Authentication → Providers → Apple, enable it and add `com.the36thcompany.songsnap` under Client IDs. No secret key needed for the in-app button.
+
+**Store checklist** (already built in): in-app account deletion, report post/comment, block user, terms & community guidelines with zero-tolerance policy, Sign in with Apple on iOS, no microphone or storage permissions.
+Reported content is in Supabase → Table Editor → `reports`. The terms promise review within 24 hours.
 
 ## Features
 

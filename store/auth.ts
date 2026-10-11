@@ -1,9 +1,11 @@
 import type { Session } from '@supabase/supabase-js';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
-import { getMyProfile } from '../lib/api';
+import { getMyProfile, updateProfile } from '../lib/api';
+import { clearSafetyCache } from '../lib/safety';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../lib/types';
 
@@ -17,6 +19,7 @@ interface AuthState {
   refreshProfile: () => Promise<void>;
   setProfile: (p: Profile) => void;
   signInWithGoogle: () => Promise<void>;
+  signInWithApple: () => Promise<void>;
   signInAsGuest: () => Promise<void>;
   upgradeGuest: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -92,6 +95,36 @@ export const useAuth = create<AuthState>((set, get) => ({
     await completeNativeOAuth(data.url, redirectTo);
   },
 
+  // iOS only: native Sign in with Apple, exchanged for a Supabase session.
+  signInWithApple: async () => {
+    let cred: AppleAuthentication.AppleAuthenticationCredential;
+    try {
+      cred = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === 'ERR_REQUEST_CANCELED') return;
+      throw e;
+    }
+    if (!cred.identityToken) throw new Error('Apple did not return a sign-in token');
+    const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token: cred.identityToken });
+    if (error) throw error;
+
+    // Apple only shares the name on the very first sign-in, and not inside the token.
+    const name = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(' ').trim();
+    if (name && data.user) {
+      try {
+        const updated = await updateProfile(data.user.id, { name: name.slice(0, 50) });
+        set({ profile: { ...(get().profile ?? updated), ...updated } });
+      } catch {
+        /* keep the default name */
+      }
+    }
+  },
+
   signInAsGuest: async () => {
     const { error } = await supabase.auth.signInAnonymously();
     if (error) throw error;
@@ -118,6 +151,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
+    clearSafetyCache();
     set({ session: null, profile: null });
   },
 }));

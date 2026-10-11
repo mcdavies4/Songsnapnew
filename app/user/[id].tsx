@@ -1,11 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { showSheet } from '../../components/ActionSheet';
 import Button from '../../components/Button';
 import PostList from '../../components/PostList';
 import ProfileHeader from '../../components/ProfileHeader';
 import { Empty, Header, Loading, Screen } from '../../components/Screen';
 import { follow, getProfile, isFollowing, unfollow } from '../../lib/api';
+import { blockFlow, isBlocked, unblockUser } from '../../lib/safety';
 import { colors, fonts } from '../../lib/theme';
 import type { Profile } from '../../lib/types';
 import { errorMessage, notify } from '../../lib/ui';
@@ -18,6 +21,7 @@ export default function UserScreen() {
   const myId = session?.user.id;
   const [profile, setProfile] = useState<Profile | null>(null);
   const [following, setFollowing] = useState(false);
+  const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [glow, setGlow] = useState<string | null>(null);
@@ -25,11 +29,12 @@ export default function UserScreen() {
   useEffect(() => {
     if (!id || !myId || id === myId) return;
     let alive = true;
-    Promise.all([getProfile(id), isFollowing(myId, id)])
-      .then(([p, f]) => {
+    Promise.all([getProfile(id), isFollowing(myId, id), isBlocked(id)])
+      .then(([p, f, b]) => {
         if (!alive) return;
         setProfile(p);
         setFollowing(f);
+        setBlocked(b);
       })
       .catch((e) => alive && setError(errorMessage(e, 'User not found')));
     return () => {
@@ -59,13 +64,67 @@ export default function UserScreen() {
     }
   };
 
+  const unblock = async () => {
+    if (!myId || !profile) return;
+    try {
+      await unblockUser(myId, profile.id);
+      setBlocked(false);
+    } catch (e) {
+      notify("Couldn't unblock", errorMessage(e));
+    }
+  };
+
+  const openMenu = () => {
+    if (!myId || !profile) return;
+    showSheet(
+      profile.name,
+      blocked
+        ? [{ label: `Unblock ${profile.name}`, onPress: unblock }]
+        : [
+            {
+              label: `Block ${profile.name}`,
+              destructive: true,
+              hint: "Hide everything they post. They won't be told.",
+              onPress: async () => {
+                const done = await blockFlow(myId, { id: profile.id, name: profile.name });
+                if (done) {
+                  setBlocked(true);
+                  if (following) {
+                    setFollowing(false);
+                    setProfile((p) => (p ? { ...p, followers_count: Math.max(0, p.followers_count - 1) } : p));
+                    refreshMe();
+                  }
+                }
+              },
+            },
+          ]
+    );
+  };
+
   return (
     <Screen>
-      <Header title={profile ? `@${profile.username}` : 'Profile'} back />
+      <Header
+        title={profile ? `@${profile.username}` : 'Profile'}
+        back
+        right={
+          profile ? (
+            <Pressable onPress={openMenu} hitSlop={10} accessibilityLabel="More options">
+              <Ionicons name="ellipsis-horizontal" size={22} color={colors.haze} />
+            </Pressable>
+          ) : null
+        }
+      />
       {error ? (
         <Empty emoji="🫥" title="Profile not found" text="This account may have been deleted." />
       ) : !profile ? (
         <Loading />
+      ) : blocked ? (
+        <Empty
+          emoji="🚫"
+          title={`You blocked ${profile.name}`}
+          text="You won't see their posts or comments."
+          action={<Button title="Unblock" variant="quiet" onPress={unblock} style={{ marginTop: 10 }} />}
+        />
       ) : (
         <PostList
           query={{ scope: 'user', userId: profile.id }}

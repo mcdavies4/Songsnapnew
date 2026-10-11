@@ -7,7 +7,9 @@ import { colors, fonts } from '../lib/theme';
 import { ago } from '../lib/time';
 import type { Post } from '../lib/types';
 import { confirm, errorMessage, notify } from '../lib/ui';
+import { blockFlow, reportFlow } from '../lib/safety';
 import { useAuth } from '../store/auth';
+import { showSheet } from './ActionSheet';
 import Avatar from './Avatar';
 import MoodChip from './MoodChip';
 import { ReactButton, ReactionPicker, ReactionSummary, useReaction } from './Reactions';
@@ -16,6 +18,8 @@ import Sleeve from './Sleeve';
 type Props = {
   post: Post;
   onDeleted?: (id: string) => void;
+  /** Called after the viewer blocks this post's author. */
+  onBlocked?: (userId: string) => void;
   /** On the post page itself we don't link to it or show the comment preview. */
   standalone?: boolean;
 };
@@ -44,7 +48,7 @@ export async function sharePost(post: Post) {
   }
 }
 
-function PostCard({ post, onDeleted, standalone = false }: Props) {
+function PostCard({ post, onDeleted, onBlocked, standalone = false }: Props) {
   const myId = useAuth((s) => s.session?.user.id);
   const [picking, setPicking] = useState(false);
   const r = useReaction(myId, post.id, {
@@ -65,6 +69,25 @@ function PostCard({ post, onDeleted, standalone = false }: Props) {
     }
   };
 
+  const openMenu = () => {
+    if (!myId) return;
+    if (post.user_id === myId) {
+      showSheet('Your post', [{ label: 'Delete post', destructive: true, onPress: remove }]);
+      return;
+    }
+    const name = post.author?.name ?? 'this person';
+    showSheet(`Post by ${name}`, [
+      { label: 'Share post', onPress: () => sharePost(post) },
+      { label: 'Report post', onPress: () => reportFlow(myId, 'post', { postId: post.id }, () => onDeleted?.(post.id)) },
+      {
+        label: `Block ${name}`,
+        destructive: true,
+        hint: "Hide everything they post. They won't be told.",
+        onPress: () => blockFlow(myId, { id: post.user_id, name }, () => onBlocked?.(post.user_id)),
+      },
+    ]);
+  };
+
   return (
     <View style={styles.item}>
       <View style={styles.head}>
@@ -80,11 +103,9 @@ function PostCard({ post, onDeleted, standalone = false }: Props) {
           </Text>
         </Pressable>
         <Text style={styles.time}>{ago(post.created_at)}</Text>
-        {post.user_id === myId && (
-          <Pressable hitSlop={10} onPress={remove} accessibilityLabel="Delete post" style={{ marginLeft: 4 }}>
-            <Ionicons name="trash-outline" size={17} color={colors.dim} />
-          </Pressable>
-        )}
+        <Pressable hitSlop={10} onPress={openMenu} accessibilityLabel="More options" style={{ marginLeft: 2 }}>
+          <Ionicons name="ellipsis-horizontal" size={19} color={colors.dim} />
+        </Pressable>
       </View>
 
       {!!post.content && (
